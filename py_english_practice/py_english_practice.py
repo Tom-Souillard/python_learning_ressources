@@ -113,6 +113,8 @@ def setup_and_launch_quiz ():
     quiz = Quiz(selected_sentences, feedback_mode)
     quiz.start()
 
+    return quiz  # Retournez l'instance de Quiz pour réutilisation
+
 def get_user_category():
     categories = sentence_to_translate.get_categories()
     print("Choisissez une catégorie de phrases à traduire : ")
@@ -133,42 +135,75 @@ def view_history():
         english_sentence = details['en']
         print(f"{nb_errors: <11} | {french_sentence: <60} | {english_sentence: <60}")
 
-def main_menu():
-    return QuizInterface.get_user_input(
-        "***********************\n"
-        "Choisissez une option :\n"
-        "0. Consulter l’historique des erreurs\n"
-        "1. Commencer le Quiz\n"
-        "2. Quitter le jeu\n: ", [0, 1, 2])
+def main_menu(quiz_completed):
+    options = ("0. Consulter l’historique des erreurs\n"
+               "1. Commencer le Quiz\n"
+               "2. Quitter le jeu")
+    if quiz_completed:
+        options += "\n3. Même quiz, mêmes questions : êtes-vous prêt à améliorer votre score ?"
+    options_prompt = f"***********************\nChoisissez une option :\n{options}\n: "
+    if quiz_completed:
+        return QuizInterface.get_user_input(options_prompt, [0, 1, 2, 3])
+    else:
+        return QuizInterface.get_user_input(options_prompt, [0, 1, 2])
+
 
 def handle_history():
     view_history()
     return True  # Continue à afficher le menu principal
 
 def handle_quiz():
-    setup_and_launch_quiz()
-    return True  # Continue à afficher le menu principal
+    global quiz_completed
+    feedback_mode = QuizInterface.get_user_input("Choisissez votre mode de feedback : \n1. 'immédiat' pour un retour après chaque question.\n0. 'final' pour un récapitulatif à la fin.\nVotre choix : ", [0, 1])
+    user_category = get_user_category()
+    number_of_questions = QuizInterface.get_user_input("Combien de questions voulez-vous? \n: ", range(1, 1001))
+
+    if user_category == "all":
+        sentences = []
+        for category in sentence_to_translate.get_categories():
+            sentences.extend(sentence_to_translate.get_sentences(category))
+    else:
+        sentences = sentence_to_translate.get_sentences(user_category)
+
+    selected_sentences = random.sample(sentences, min(number_of_questions, len(sentences)))
+    quiz = Quiz(selected_sentences, feedback_mode)
+    quiz.start()
+
+    quiz_completed = True  # Marquez le quiz comme complété après son achèvement
+
+    return quiz  # Retournez l'instance de Quiz pour une éventuelle réutilisation
+
+
 
 def handle_exit():
     print("\nMerci d’avoir utilisé le quiz. Au revoir.")
     return False  # Quitte le programme
 
+def replay_quiz(quiz):
+    print("\nRejouons le même quiz pour tenter d'améliorer votre score !\n")
+    quiz.start()
+
+
 def main():
+    global quiz_completed
+    quiz_completed = False
+    last_quiz = None
     QuizInterface.display_quiz_text("WordBridge Quiz")
     QuizInterface.display_welcome_message()
 
-    action_handlers = {
-        0: handle_history,
-        1: handle_quiz,
-        2: handle_exit
-    }
-
     continue_running = True
     while continue_running:
-        user_choice = main_menu()
-        action_handler = action_handlers.get(user_choice)
-        if action_handler:
-            continue_running = action_handler()
+        user_choice = main_menu(quiz_completed)
+        if user_choice == 1:
+            last_quiz = setup_and_launch_quiz()
+            quiz_completed = True  # Marquez un quiz comme complété
+        elif user_choice == 2:
+            print("\nMerci d’avoir utilisé le quiz. Au revoir.")
+            break  # Sortie du programme
+        elif user_choice == 3 and last_quiz is not None:
+            replay_quiz(last_quiz)  # Rejeu avec l'instance existante
+        elif user_choice == 0:
+            handle_history()  # Gestion de l'historique
 
 
 if __name__ == "__main__":
